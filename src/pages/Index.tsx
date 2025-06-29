@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChatInterface from '@/components/ChatInterface';
@@ -41,6 +40,16 @@ const Index = () => {
 
   const handleExpenseAdded = (expense: Expense) => {
     setExpenses(prev => [...prev, expense]);
+  };
+
+  const handleExpenseUpdated = (updatedExpense: Expense) => {
+    setExpenses(prev => prev.map(expense => 
+      expense.id === updatedExpense.id ? updatedExpense : expense
+    ));
+  };
+
+  const handleExpenseDeleted = (expenseId: string) => {
+    setExpenses(prev => prev.filter(expense => expense.id !== expenseId));
   };
 
   const handleTaskAdded = (task: Task) => {
@@ -114,7 +123,11 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="expenses">
-              <ExpenseSummary expenses={expenses} />
+              <ExpenseSummary 
+                expenses={expenses} 
+                onExpenseUpdated={handleExpenseUpdated}
+                onExpenseDeleted={handleExpenseDeleted}
+              />
             </TabsContent>
 
             <TabsContent value="tasks">

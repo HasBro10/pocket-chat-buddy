@@ -1,9 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { TrendingUp, DollarSign, Edit, Trash2 } from 'lucide-react';
 
 interface Expense {
   id: string;
@@ -15,9 +19,18 @@ interface Expense {
 
 interface ExpenseSummaryProps {
   expenses: Expense[];
+  onExpenseUpdated?: (updatedExpense: Expense) => void;
+  onExpenseDeleted?: (expenseId: string) => void;
 }
 
-const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
+const ExpenseSummary = ({ expenses, onExpenseUpdated, onExpenseDeleted }: ExpenseSummaryProps) => {
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editForm, setEditForm] = useState({
+    amount: '',
+    category: '',
+    description: ''
+  });
+
   const totalToday = expenses
     .filter(expense => {
       const today = new Date();
@@ -46,6 +59,34 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
   const recentExpenses = expenses
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
+
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditForm({
+      amount: expense.amount.toString(),
+      category: expense.category,
+      description: expense.description
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingExpense && onExpenseUpdated) {
+      const updatedExpense = {
+        ...editingExpense,
+        amount: parseFloat(editForm.amount),
+        category: editForm.category,
+        description: editForm.description
+      };
+      onExpenseUpdated(updatedExpense);
+      setEditingExpense(null);
+    }
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    if (onExpenseDeleted) {
+      onExpenseDeleted(expenseId);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -92,8 +133,80 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
                       {new Date(expense.date).toLocaleDateString()} • {expense.category}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-2">
                     <p className="font-bold text-gray-800">{formatCurrency(expense.amount)}</p>
+                    <div className="flex gap-1">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleEditExpense(expense)}
+                            className="h-8 w-8"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit Expense</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-sm font-medium">Amount</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editForm.amount}
+                                onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Category</label>
+                              <Input
+                                value={editForm.category}
+                                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Description</label>
+                              <Input
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                              />
+                            </div>
+                            <Button onClick={handleSaveEdit} className="w-full">
+                              Save Changes
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this expense? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteExpense(expense.id)}
+                              className="bg-red-500 hover:bg-red-600"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </div>
               ))
