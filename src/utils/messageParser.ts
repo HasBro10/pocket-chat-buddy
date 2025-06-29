@@ -29,7 +29,7 @@ export const parseUserMessage = (message: string): ParsedMessage => {
     };
   }
   
-  // Parse amount (£, $, or just numbers) - only after checking for reminders
+  // Parse amount - now includes standalone numbers as £
   const amountRegex = /[£$]?(\d+(?:\.\d{2})?)/;
   const amountMatch = message.match(amountRegex);
   const amount = amountMatch ? parseFloat(amountMatch[1]) : undefined;
@@ -54,14 +54,17 @@ export const parseUserMessage = (message: string): ParsedMessage => {
     }
   }
   
-  // Check for expense patterns (only if amount is present and no reminder keywords)
+  // Check for expense patterns (standalone numbers now count as expenses)
   if (amount && (
     lowerMessage.includes('£') || 
     lowerMessage.includes('$') || 
     lowerMessage.includes('spent') || 
     lowerMessage.includes('cost') ||
     lowerMessage.includes('paid') ||
-    Object.values(categoryKeywords).flat().some(keyword => lowerMessage.includes(keyword))
+    Object.values(categoryKeywords).flat().some(keyword => lowerMessage.includes(keyword)) ||
+    // If it's just a number with context words, treat as expense
+    /^\d+(\.\d{2})?\s*\w+/.test(message.trim()) ||
+    /\w+\s*\d+(\.\d{2})?$/.test(message.trim())
   )) {
     return {
       type: 'expense',
