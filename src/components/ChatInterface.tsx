@@ -101,9 +101,13 @@ const ChatInterface = ({ onExpenseAdded, onTaskAdded, onReminderAdded, onNoteAdd
         text: systemResponse,
         type: 'system',
         timestamp: new Date(),
-        parsedType: parsed.type,
         amount: parsed.amount,
       };
+
+      // Only assign parsedType if it's not 'unknown'
+      if (parsed.type !== 'unknown') {
+        systemMessage.parsedType = parsed.type;
+      }
 
       setMessages(prev => [...prev, systemMessage]);
     }, 500);
