@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, DollarSign, Clock, CheckSquare, FileText } from 'lucide-react';
+import { Send, DollarSign, Clock, CheckSquare, FileText, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { parseUserMessage } from '@/utils/messageParser';
@@ -9,11 +9,12 @@ import { formatCurrency } from '@/utils/formatCurrency';
 interface Message {
   id: string;
   text: string;
-  type: 'user' | 'system';
+  type: 'user' | 'system' | 'confirmation';
   timestamp: Date;
   category?: string;
   amount?: number;
   parsedType?: 'expense' | 'reminder' | 'task' | 'note';
+  pendingData?: any;
 }
 
 interface ChatInterfaceProps {
@@ -43,6 +44,45 @@ const ChatInterface = ({ onExpenseAdded, onTaskAdded, onReminderAdded, onNoteAdd
     scrollToBottom();
   }, [messages]);
 
+  const handleConfirmLog = (messageId: string, confirm: boolean) => {
+    const message = messages.find(m => m.id === messageId);
+    if (!message || !message.pendingData) return;
+
+    if (confirm) {
+      // Log the item based on its type
+      if (message.parsedType === 'expense') {
+        onExpenseAdded(message.pendingData);
+      } else if (message.parsedType === 'reminder') {
+        onReminderAdded(message.pendingData);
+      } else if (message.parsedType === 'task') {
+        onTaskAdded(message.pendingData);
+      } else if (message.parsedType === 'note') {
+        onNoteAdded(message.pendingData);
+      }
+
+      // Add success message
+      const successMessage: Message = {
+        id: Date.now().toString(),
+        text: `✅ Logged successfully!`,
+        type: 'system',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, successMessage]);
+    } else {
+      // Add cancelled message
+      const cancelMessage: Message = {
+        id: Date.now().toString(),
+        text: `❌ Cancelled - not logged.`,
+        type: 'system',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, cancelMessage]);
+    }
+
+    // Remove the confirmation message
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+  };
+
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
 
@@ -59,57 +99,63 @@ const ChatInterface = ({ onExpenseAdded, onTaskAdded, onReminderAdded, onNoteAdd
 
     // Generate system response based on parsed message
     setTimeout(() => {
-      let systemResponse = '';
-      
-      if (parsed.type === 'expense' && parsed.amount) {
-        systemResponse = `✅ Logged expense: ${formatCurrency(parsed.amount)} for ${parsed.category || 'General'}`;
-        onExpenseAdded({
-          id: Date.now().toString(),
-          amount: parsed.amount,
-          category: parsed.category || 'General',
-          description: parsed.description || inputText,
-          date: new Date(),
-        });
-      } else if (parsed.type === 'reminder') {
-        systemResponse = `⏰ Reminder set: ${parsed.description}`;
-        onReminderAdded({
-          id: Date.now().toString(),
-          description: parsed.description,
-          date: parsed.date || new Date(),
-        });
-      } else if (parsed.type === 'task') {
-        systemResponse = `📝 Task added: ${parsed.description}`;
-        onTaskAdded({
-          id: Date.now().toString(),
-          description: parsed.description,
-          completed: false,
-          date: new Date(),
-        });
-      } else if (parsed.type === 'note') {
-        systemResponse = `📄 Note saved: ${parsed.description}`;
-        onNoteAdded({
-          id: Date.now().toString(),
-          content: parsed.description,
-          date: new Date(),
-        });
-      } else {
-        systemResponse = "I didn't quite understand that. Try something like 'Lunch £12' or 'Remind me to call John tomorrow'.";
-      }
-
-      const systemMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: systemResponse,
-        type: 'system',
-        timestamp: new Date(),
-        amount: parsed.amount,
-      };
-
-      // Only assign parsedType if it's not 'unknown'
       if (parsed.type !== 'unknown') {
-        systemMessage.parsedType = parsed.type;
-      }
+        let confirmationText = '';
+        let pendingData = null;
+        
+        if (parsed.type === 'expense' && parsed.amount) {
+          confirmationText = `💰 Log expense: ${formatCurrency(parsed.amount)} for ${parsed.category || 'General'}?`;
+          pendingData = {
+            id: Date.now().toString(),
+            amount: parsed.amount,
+            category: parsed.category || 'General',
+            description: parsed.description || inputText,
+            date: new Date(),
+          };
+        } else if (parsed.type === 'reminder') {
+          confirmationText = `⏰ Set reminder: ${parsed.description}?`;
+          pendingData = {
+            id: Date.now().toString(),
+            description: parsed.description,
+            date: parsed.date || new Date(),
+          };
+        } else if (parsed.type === 'task') {
+          confirmationText = `📝 Add task: ${parsed.description}?`;
+          pendingData = {
+            id: Date.now().toString(),
+            description: parsed.description,
+            completed: false,
+            date: new Date(),
+          };
+        } else if (parsed.type === 'note') {
+          confirmationText = `📄 Save note: ${parsed.description}?`;
+          pendingData = {
+            id: Date.now().toString(),
+            content: parsed.description,
+            date: new Date(),
+          };
+        }
 
-      setMessages(prev => [...prev, systemMessage]);
+        const confirmationMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: confirmationText,
+          type: 'confirmation',
+          timestamp: new Date(),
+          parsedType: parsed.type,
+          pendingData: pendingData,
+        };
+
+        setMessages(prev => [...prev, confirmationMessage]);
+      } else {
+        const systemMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "I didn't quite understand that. Try something like 'Lunch £12' or 'Remind me to call John tomorrow'.",
+          type: 'system',
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, systemMessage]);
+      }
     }, 500);
 
     setInputText('');
@@ -150,6 +196,8 @@ const ChatInterface = ({ onExpenseAdded, onTaskAdded, onReminderAdded, onNoteAdd
               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                 message.type === 'user'
                   ? 'bg-blue-500 text-white'
+                  : message.type === 'confirmation'
+                  ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
                   : 'bg-gray-100 text-gray-800'
               } shadow-sm`}
             >
@@ -157,6 +205,29 @@ const ChatInterface = ({ onExpenseAdded, onTaskAdded, onReminderAdded, onNoteAdd
                 {getMessageIcon(message)}
                 <span className="text-sm">{message.text}</span>
               </div>
+              
+              {message.type === 'confirmation' && (
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleConfirmLog(message.id, true)}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-xs"
+                  >
+                    <Check className="w-3 h-3 mr-1" />
+                    Yes
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleConfirmLog(message.id, false)}
+                    className="px-3 py-1 text-xs"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    No
+                  </Button>
+                </div>
+              )}
+              
               <div className="text-xs opacity-70 mt-1">
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
