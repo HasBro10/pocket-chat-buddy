@@ -10,7 +10,26 @@ interface ParsedMessage {
 export const parseUserMessage = (message: string): ParsedMessage => {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Parse amount (£, $, or just numbers)
+  // Check for reminder patterns FIRST (before expense parsing)
+  if (lowerMessage.includes('remind') || lowerMessage.includes('reminder')) {
+    const description = message.replace(/remind me to\s*/i, '').replace(/reminder:?\s*/i, '').trim();
+    
+    // Simple date parsing for common phrases
+    let reminderDate = new Date();
+    if (lowerMessage.includes('tomorrow')) {
+      reminderDate.setDate(reminderDate.getDate() + 1);
+    } else if (lowerMessage.includes('next week')) {
+      reminderDate.setDate(reminderDate.getDate() + 7);
+    }
+    
+    return {
+      type: 'reminder',
+      description,
+      date: reminderDate
+    };
+  }
+  
+  // Parse amount (£, $, or just numbers) - only after checking for reminders
   const amountRegex = /[£$]?(\d+(?:\.\d{2})?)/;
   const amountMatch = message.match(amountRegex);
   const amount = amountMatch ? parseFloat(amountMatch[1]) : undefined;
@@ -35,7 +54,7 @@ export const parseUserMessage = (message: string): ParsedMessage => {
     }
   }
   
-  // Check for expense patterns
+  // Check for expense patterns (only if amount is present and no reminder keywords)
   if (amount && (
     lowerMessage.includes('£') || 
     lowerMessage.includes('$') || 
@@ -49,25 +68,6 @@ export const parseUserMessage = (message: string): ParsedMessage => {
       amount,
       category,
       description: message.trim()
-    };
-  }
-  
-  // Check for reminder patterns
-  if (lowerMessage.includes('remind') || lowerMessage.includes('reminder')) {
-    const description = message.replace(/remind me to\s*/i, '').replace(/reminder:?\s*/i, '').trim();
-    
-    // Simple date parsing for common phrases
-    let reminderDate = new Date();
-    if (lowerMessage.includes('tomorrow')) {
-      reminderDate.setDate(reminderDate.getDate() + 1);
-    } else if (lowerMessage.includes('next week')) {
-      reminderDate.setDate(reminderDate.getDate() + 7);
-    }
-    
-    return {
-      type: 'reminder',
-      description,
-      date: reminderDate
     };
   }
   
